@@ -65,6 +65,17 @@ export default function ScheduleCard({ schedule, onAction }: { schedule: Schedul
         <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
           <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-cyan-500 transition-all" style={{ width: `${progress}%` }} />
         </div>
+        {schedule.kind === "Cliff" &&
+          schedule.cliff_duration > 0 &&
+          now < schedule.start_time + schedule.cliff_duration &&
+          !schedule.revoked && (
+            <p className="text-xs text-zinc-500 mt-1.5">
+              Unlocks on{" "}
+              <span className="text-zinc-300">
+                {formatDate(schedule.start_time + schedule.cliff_duration)}
+              </span>
+            </p>
+          )}
       </div>
 
       {err && <p className="text-xs text-red-400">{err}</p>}
