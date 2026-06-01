@@ -297,6 +297,50 @@
                         "key": {
                           "vec": [
                             {
+                              "symbol": "BeneficiarySchedules"
+                            },
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "vec": [
+                            {
+                              "u64": 1
+                            },
+                            {
+                              "u64": 2
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "GrantorSchedules"
+                            },
+                            {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "vec": [
+                            {
+                              "u64": 1
+                            },
+                            {
+                              "u64": 2
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
                               "symbol": "Schedule"
                             },
                             {
@@ -409,6 +453,17 @@
                                 "i128": {
                                   "hi": 0,
                                   "lo": 1000
+                                }
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "vested_at_revoke"
+                              },
+                              "val": {
+                                "i128": {
+                                  "hi": 0,
+                                  "lo": 0
                                 }
                               }
                             }
@@ -531,6 +586,17 @@
                                 "i128": {
                                   "hi": 0,
                                   "lo": 2000
+                                }
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "vested_at_revoke"
+                              },
+                              "val": {
+                                "i128": {
+                                  "hi": 0,
+                                  "lo": 0
                                 }
                               }
                             }
