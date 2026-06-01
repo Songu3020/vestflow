@@ -1,0 +1,113 @@
+# Auto-merge Dependabot PRs for patch and minor updates
+# This workflow automatically merges Dependabot PRs that pass all checks
+# Only applies to patch and minor version updates for safety
+
+name: Dependabot Auto-Merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+jobs:
+  auto-merge:
+    name: Auto-merge Dependabot PRs
+    runs-on: ubuntu-latest
+    
+    # Only run for Dependabot PRs
+    if: github.actor == 'dependabot[bot]'
+    
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Set up Rust
+        if: contains(steps.metadata.outputs.dependency-names, 'soroban')
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+
+      - name: Install dependencies (main)
+        run: npm ci
+
+      - name: Install dependencies (indexer)
+        run: |
+          cd indexer
+          npm ci
+
+      - name: Build main application
+        run: npm run build
+
+      - name: Build indexer
+        run: |
+          cd indexer
+          npm run build
+
+      - name: Build contracts
+        if: contains(steps.metadata.outputs.dependency-names, 'soroban')
+        run: |
+          cd contracts
+          cargo build --release --target wasm32-unknown-unknown
+
+      - name: Run contract tests
+        if: contains(steps.metadata.outputs.dependency-names, 'soroban')
+        run: |
+          cd contracts
+          cargo test
+
+      - name: Auto-merge patch and minor updates
+        # Only auto-merge patch and minor updates, not major ones
+        if: |
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        run: |
+          gh pr merge --auto --squash "${{ github.event.pull_request.html_url }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment on major updates
+        # For major updates, add a comment but don't auto-merge
+        if: steps.metadata.outputs.update-type == 'version-update:semver-major'
+        run: |
+          gh pr comment "${{ github.event.pull_request.html_url }}" --body "🚨 **Major version update detected!**
+          
+          This PR contains major version updates that may include breaking changes:
+          - **Dependencies:** ${{ steps.metadata.outputs.dependency-names }}
+          - **Update type:** ${{ steps.metadata.outputs.update-type }}
+          
+          Please review the changelog and test thoroughly before merging.
+          
+          **Manual review required** - this PR will not be auto-merged."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add labels based on update type
+        run: |
+          if [[ "${{ steps.metadata.outputs.update-type }}" == "version-update:semver-major" ]]; then
+            gh pr edit "${{ github.event.pull_request.html_url }}" --add-label "breaking-change,needs-review"
+          elif [[ "${{ steps.metadata.outputs.update-type }}" == "version-update:semver-minor" ]]; then
+            gh pr edit "${{ github.event.pull_request.html_url }}" --add-label "enhancement,auto-mergeable"
+          else
+            gh pr edit "${{ github.event.pull_request.html_url }}" --add-label "patch,auto-mergeable"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

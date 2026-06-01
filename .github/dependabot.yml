@@ -1,0 +1,187 @@
+# Dependabot configuration for VestFlow
+# Automated dependency updates for Rust crates and npm packages
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # Main Next.js application npm dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "anuoluwaponiorimi"
+    assignees:
+      - "anuoluwaponiorimi"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "npm"
+      - "frontend"
+    # Group related updates together
+    groups:
+      stellar-ecosystem:
+        patterns:
+          - "@stellar/*"
+        update-types:
+          - "minor"
+          - "patch"
+      react-ecosystem:
+        patterns:
+          - "react*"
+          - "@types/react*"
+        update-types:
+          - "minor"
+          - "patch"
+      next-ecosystem:
+        patterns:
+          - "next*"
+          - "@next/*"
+        update-types:
+          - "minor"
+          - "patch"
+      tailwind-ecosystem:
+        patterns:
+          - "tailwindcss*"
+          - "@tailwindcss/*"
+        update-types:
+          - "minor"
+          - "patch"
+      typescript-ecosystem:
+        patterns:
+          - "typescript*"
+          - "@types/*"
+        update-types:
+          - "minor"
+          - "patch"
+    # Ignore major version updates for critical dependencies
+    ignore:
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+
+  # Indexer service npm dependencies
+  - package-ecosystem: "npm"
+    directory: "/indexer"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:30"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "anuoluwaponiorimi"
+    assignees:
+      - "anuoluwaponiorimi"
+    commit-message:
+      prefix: "deps(indexer)"
+      prefix-development: "deps-dev(indexer)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "npm"
+      - "indexer"
+    # Group related updates together
+    groups:
+      stellar-ecosystem:
+        patterns:
+          - "@stellar/*"
+        update-types:
+          - "minor"
+          - "patch"
+      node-ecosystem:
+        patterns:
+          - "@types/node*"
+          - "ts-node*"
+        update-types:
+          - "minor"
+          - "patch"
+      database-ecosystem:
+        patterns:
+          - "*sqlite*"
+          - "@types/*sqlite*"
+        update-types:
+          - "minor"
+          - "patch"
+    # Ignore major version updates for critical dependencies
+    ignore:
+      - dependency-name: "better-sqlite3"
+        update-types: ["version-update:semver-major"]
+
+  # Rust dependencies for smart contracts
+  - package-ecosystem: "cargo"
+    directory: "/contracts"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "anuoluwaponiorimi"
+    assignees:
+      - "anuoluwaponiorimi"
+    commit-message:
+      prefix: "deps(contracts)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "rust"
+      - "contracts"
+    # Group Soroban-related updates
+    groups:
+      soroban-ecosystem:
+        patterns:
+          - "soroban-*"
+        update-types:
+          - "minor"
+          - "patch"
+    # Be more conservative with Soroban SDK updates
+    ignore:
+      - dependency-name: "soroban-sdk"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions workflow dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "anuoluwaponiorimi"
+    assignees:
+      - "anuoluwaponiorimi"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "ci/cd"
+    # Group action updates by provider
+    groups:
+      actions-ecosystem:
+        patterns:
+          - "actions/*"
+        update-types:
+          - "minor"
+          - "patch"
+      setup-actions:
+        patterns:
+          - "*/setup-*"
+        update-types:
+          - "minor"
+          - "patch"
