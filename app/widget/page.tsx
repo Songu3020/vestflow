@@ -186,7 +186,7 @@ export default function WidgetPage() {
                     <li>✓ Shows real-time vesting progress</li>
                     <li>✓ Responsive and mobile-friendly</li>
                     <li>✓ Dark mode by default (matches most modern UIs)</li>
-                    <li>✓ Lightweight (< 5KB gzipped)</li>
+                    <li>✓ Lightweight (&lt; 5KB gzipped)</li>
                     <li>✓ No external dependencies</li>
                     <li>✓ Works on any website</li>
                   </ul>

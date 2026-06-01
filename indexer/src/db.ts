@@ -264,3 +264,142 @@ export function recordDailySnapshot(stats: AnalyticsStats): void {
       stats.total_revoked
     );
 }
+
+// ── Notifications ──────────────────────────────────────────────────────────
+
+export interface NotificationSubscription {
+  id: number;
+  email: string;
+  schedule_id: number;
+  beneficiary_address: string;
+  notification_type: string;
+  is_active: number;
+  verified: number;
+  verification_token?: string;
+  created_at: number;
+  updated_at: number;
+}
+
+/**
+ * Create a new notification subscription
+ */
+export function createNotificationSubscription(
+  email: string,
+  scheduleId: number,
+  beneficiaryAddress: string,
+  notificationType: string
+): NotificationSubscription {
+  const verificationToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  
+  const result = getDb()
+    .prepare(
+      `INSERT INTO notification_subscriptions (email, schedule_id, beneficiary_address, notification_type, verification_token)
+       VALUES (?, ?, ?, ?, ?)`
+    )
+    .run(email, scheduleId, beneficiaryAddress, notificationType, verificationToken);
+
+  return {
+    id: result.lastInsertRowid as number,
+    email,
+    schedule_id: scheduleId,
+    beneficiary_address: beneficiaryAddress,
+    notification_type: notificationType,
+    is_active: 0,
+    verified: 0,
+    verification_token: verificationToken,
+    created_at: Math.floor(Date.now() / 1000),
+    updated_at: Math.floor(Date.now() / 1000),
+  };
+}
+
+/**
+ * Get a subscription by ID
+ */
+export function getNotificationSubscription(id: number): NotificationSubscription | null {
+  const row = getDb()
+    .prepare("SELECT * FROM notification_subscriptions WHERE id = ?")
+    .get(id) as NotificationSubscription | undefined;
+  return row || null;
+}
+
+/**
+ * Get subscriptions by email
+ */
+export function getSubscriptionsByEmail(email: string): NotificationSubscription[] {
+  return getDb()
+    .prepare("SELECT * FROM notification_subscriptions WHERE email = ? AND is_active = 1")
+    .all(email) as NotificationSubscription[];
+}
+
+/**
+ * Get subscriptions for a schedule
+ */
+export function getSubscriptionsBySchedule(scheduleId: number): NotificationSubscription[] {
+  return getDb()
+    .prepare("SELECT * FROM notification_subscriptions WHERE schedule_id = ? AND is_active = 1 AND verified = 1")
+    .all(scheduleId) as NotificationSubscription[];
+}
+
+/**
+ * Verify an email subscription
+ */
+export function verifyNotificationSubscription(verificationToken: string): boolean {
+  const result = getDb()
+    .prepare(
+      `UPDATE notification_subscriptions 
+       SET verified = 1, is_active = 1, updated_at = ? 
+       WHERE verification_token = ? AND verified = 0`
+    )
+    .run(Math.floor(Date.now() / 1000), verificationToken);
+  return result.changes > 0;
+}
+
+/**
+ * Unsubscribe from notifications
+ */
+export function unsubscribeNotifications(id: number): boolean {
+  const result = getDb()
+    .prepare("UPDATE notification_subscriptions SET is_active = 0, updated_at = ? WHERE id = ?")
+    .run(Math.floor(Date.now() / 1000), id);
+  return result.changes > 0;
+}
+
+/**
+ * Record a notification event
+ */
+export function recordNotificationEvent(
+  subscriptionId: number,
+  eventType: string,
+  scheduleId: number,
+  status: string = 'sent',
+  errorMessage?: string
+): void {
+  getDb()
+    .prepare(
+      `INSERT INTO notification_events (subscription_id, event_type, schedule_id, status, error_message)
+       VALUES (?, ?, ?, ?, ?)`
+    )
+    .run(subscriptionId, eventType, scheduleId, status, errorMessage || null);
+}
+
+/**
+ * Check if a milestone has been processed (to avoid duplicates)
+ */
+export function hasMilestoneBeenProcessed(scheduleId: number, milestoneType: string): boolean {
+  const row = getDb()
+    .prepare("SELECT id FROM notification_milestones WHERE schedule_id = ? AND milestone_type = ?")
+    .get(scheduleId, milestoneType) as { id: number } | undefined;
+  return !!row;
+}
+
+/**
+ * Mark a milestone as processed
+ */
+export function markMilestoneProcessed(scheduleId: number, milestoneType: string): void {
+  getDb()
+    .prepare(
+      `INSERT OR IGNORE INTO notification_milestones (schedule_id, milestone_type)
+       VALUES (?, ?)`
+    )
+    .run(scheduleId, milestoneType);
+}

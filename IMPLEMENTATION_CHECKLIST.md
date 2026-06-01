@@ -130,6 +130,69 @@
 
 ---
 
+## #122 - Email/Push Notifications for Vesting Milestones
+
+- [x] Update database schema (`indexer/schema.sql`)
+  - [x] Add `notification_subscriptions` table
+  - [x] Add `notification_events` table
+  - [x] Add `notification_milestones` table
+  - [x] Create appropriate indexes
+
+- [x] Add notification database functions (`indexer/src/db.ts`)
+  - [x] `createNotificationSubscription()` - Create new subscription
+  - [x] `getNotificationSubscription()` - Get subscription by ID
+  - [x] `getSubscriptionsByEmail()` - Get user's subscriptions
+  - [x] `getSubscriptionsBySchedule()` - Get subscriptions for a schedule
+  - [x] `verifyNotificationSubscription()` - Verify email
+  - [x] `unsubscribeNotifications()` - Unsubscribe user
+  - [x] `recordNotificationEvent()` - Log sent notifications
+  - [x] `hasMilestoneBeenProcessed()` - Check for duplicates
+  - [x] `markMilestoneProcessed()` - Mark milestone as processed
+
+- [x] Create email notification service (`lib/email.ts`)
+  - [x] SendGrid integration
+  - [x] HTML email templates
+  - [x] Verification email
+  - [x] Cliff reached notification
+  - [x] Claimable notification
+  - [x] Revoked notification
+
+- [x] Create notification API endpoints
+  - [x] `POST /api/notifications/subscribe` - Subscribe endpoint
+  - [x] `GET /api/notifications/verify` - Email verification
+  - [x] `POST /api/notifications/unsubscribe` - Unsubscribe endpoint
+
+- [x] Create notification indexer service (`indexer/src/notifications.ts`)
+  - [x] `checkAndSendCliffNotification()` - Check and send cliff alerts
+  - [x] `checkAndSendClaimableNotification()` - Check and send claimable alerts
+  - [x] `checkAndSendRevokedNotification()` - Check and send revoke alerts
+
+- [x] Create notification subscription UI component (`components/NotificationSubscription.tsx`)
+  - [x] Email input field
+  - [x] Notification type selector
+  - [x] Form validation
+  - [x] Loading states
+  - [x] Error/success messages
+
+- [x] Integrate into public schedule page (`app/schedule/[id]/page.tsx`)
+  - [x] Add NotificationSubscription component
+  - [x] Position before share section
+  - [x] Pass required props (scheduleId, beneficiaryAddress)
+
+- [x] Environment configuration
+  - [x] Update `.env.local.example` with SendGrid settings
+  - [x] Add SENDGRID_API_KEY
+  - [x] Add NOTIFICATION_FROM_EMAIL
+  - [x] Add NEXT_PUBLIC_BASE_URL
+
+- [x] Documentation updates (`FEATURES.md`)
+  - [x] Add notification feature overview
+  - [x] How-to guide
+  - [x] API endpoints documentation
+  - [x] Email configuration guide
+
+---
+
 ## Navigation Updates ✅
 
 - [x] Update navbar (`components/Navbar.tsx`)
@@ -157,6 +220,7 @@
   - [x] Integration guide
   - [x] Performance considerations
   - [x] Future enhancements
+  - [x] Notification feature documentation
 
 ---
 

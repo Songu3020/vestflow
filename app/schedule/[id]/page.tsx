@@ -1,6 +1,7 @@
 "use client";
 import Navbar from "@/components/Navbar";
 import VestingChart from "@/components/VestingChart";
+import NotificationSubscription from "@/components/NotificationSubscription";
 import { formatDate, NETWORK } from "@/lib/stellar";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -193,7 +194,7 @@ export default function PublicSchedulePage() {
         {/* Vesting Chart */}
         <div className="card p-6 mb-8">
           <h2 className="text-lg font-semibold mb-4">Vesting Timeline</h2>
-          <VestingChart schedule={schedule} />
+          <VestingChart schedule={schedule as any} />
         </div>
 
         {/* Schedule Details */}
@@ -266,8 +267,14 @@ export default function PublicSchedulePage() {
           </div>
         </div>
 
+        {/* Notification Subscription */}
+        <NotificationSubscription
+          scheduleId={schedule.id}
+          beneficiaryAddress={schedule.beneficiary}
+        />
+
         {/* Share Section */}
-        <div className="card p-6 mt-8 border-violet-500/20 bg-violet-500/5">
+        <div className="card p-6 border-violet-500/20 bg-violet-500/5">
           <h3 className="font-semibold mb-3">Share This Schedule</h3>
           <p className="text-sm text-zinc-400 mb-4">Copy the link below to share this public schedule view:</p>
           <div className="flex gap-2">

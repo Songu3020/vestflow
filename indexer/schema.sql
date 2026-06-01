@@ -62,3 +62,50 @@ CREATE TABLE IF NOT EXISTS daily_stats (
 );
 
 CREATE INDEX IF NOT EXISTS idx_daily_stats_date ON daily_stats (date);
+
+-- Notification subscriptions
+CREATE TABLE IF NOT EXISTS notification_subscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL UNIQUE,
+  schedule_id INTEGER NOT NULL,
+  beneficiary_address TEXT NOT NULL,
+  notification_type TEXT NOT NULL CHECK (notification_type IN ('cliff_reached', 'claimable', 'revoked', 'all')),
+  is_active INTEGER NOT NULL DEFAULT 1,
+  verified INTEGER NOT NULL DEFAULT 0,
+  verification_token TEXT UNIQUE,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+
+CREATE INDEX IF NOT EXISTS idx_sub_email ON notification_subscriptions (email);
+CREATE INDEX IF NOT EXISTS idx_sub_schedule ON notification_subscriptions (schedule_id);
+CREATE INDEX IF NOT EXISTS idx_sub_beneficiary ON notification_subscriptions (beneficiary_address);
+CREATE INDEX IF NOT EXISTS idx_sub_active ON notification_subscriptions (is_active);
+
+-- Notification events/history
+CREATE TABLE IF NOT EXISTS notification_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  subscription_id INTEGER NOT NULL,
+  event_type TEXT NOT NULL CHECK (event_type IN ('cliff_reached', 'claimable', 'revoked')),
+  schedule_id INTEGER NOT NULL,
+  sent_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  status TEXT NOT NULL DEFAULT 'sent' CHECK (status IN ('queued', 'sent', 'failed', 'bounced')),
+  error_message TEXT,
+  FOREIGN KEY (subscription_id) REFERENCES notification_subscriptions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_notif_event_sub ON notification_events (subscription_id);
+CREATE INDEX IF NOT EXISTS idx_notif_event_type ON notification_events (event_type);
+CREATE INDEX IF NOT EXISTS idx_notif_event_status ON notification_events (status);
+CREATE INDEX IF NOT EXISTS idx_notif_event_schedule ON notification_events (schedule_id);
+
+-- Processed notification milestones (to avoid duplicate notifications)
+CREATE TABLE IF NOT EXISTS notification_milestones (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  schedule_id INTEGER NOT NULL,
+  milestone_type TEXT NOT NULL CHECK (milestone_type IN ('cliff_reached', 'fully_vested', 'revoked')),
+  processed_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  UNIQUE(schedule_id, milestone_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_milestone_schedule ON notification_milestones (schedule_id);

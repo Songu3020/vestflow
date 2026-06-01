@@ -337,11 +337,69 @@ Link to public schedule views to give beneficiaries an easy way to check their v
 
 ---
 
+---
+
+### 🔔 Email Notifications for Vesting Milestones (#122)
+
+**Description**: Opt-in email notifications when important vesting events occur - cliff reached, tokens claimable, or schedule revoked.
+
+**How to Use**:
+1. Navigate to any public schedule view (`/schedule/[id]`)
+2. Scroll to the "Get Notified About Milestones" section
+3. Enter your email address
+4. Select which events you want to be notified about
+5. Click "Subscribe to Notifications"
+6. Check your email and click the verification link
+7. You'll receive notifications when milestones are reached
+
+**Features**:
+- Opt-in via email verification (prevents spam)
+- Multiple notification types:
+  - Cliff reached
+  - Tokens become claimable
+  - Schedule revoked
+  - All events
+- Rich HTML email templates
+- Beautiful, branded notification emails
+- Unsubscribe links in every email
+- Duplicate prevention (won't send duplicate notifications)
+- Error tracking for failed sends
+
+**Notification Types**:
+- **Cliff Reached**: Alerts when the cliff period ends and vesting accelerates
+- **Claimable**: Notifies when tokens are available to claim
+- **Revoked**: Alerts if the schedule is revoked by the grantor
+
+**Database Tables**:
+- `notification_subscriptions` - Stores user email subscriptions
+- `notification_events` - Tracks sent notifications
+- `notification_milestones` - Prevents duplicate notifications
+
+**API Endpoints**:
+- `POST /api/notifications/subscribe` - Subscribe to notifications
+- `GET /api/notifications/verify?token=...` - Verify email subscription
+- `POST /api/notifications/unsubscribe` - Unsubscribe from notifications
+
+**Email Configuration**:
+- Uses SendGrid for reliable email delivery (optional)
+- Requires `SENDGRID_API_KEY` environment variable
+- Falls back to console logging if SendGrid not configured
+- Customizable from email via `NOTIFICATION_FROM_EMAIL`
+
+**Routes**:
+- `/schedule/[id]` - Now includes notification subscription form
+- `/api/notifications/subscribe` - Create new subscription
+- `/api/notifications/verify` - Verify email subscription
+- `/api/notifications/unsubscribe` - Cancel subscription
+
+---
+
 ## Future Enhancements
 
 Potential improvements for future releases:
 - Advanced analytics charts (Recharts/Chart.js integration)
-- Email notifications when tokens become claimable
+- Push notifications (in-app)
+- SMS notifications as alternative to email
 - CSV export of schedule data
 - Batch schedule creation
 - Schedule analytics per grantor/beneficiary

@@ -3,10 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
-    const scheduleId = parseInt(params.id, 10);
+    const { id } = await params;
+    const scheduleId = parseInt(id, 10);
     
     if (isNaN(scheduleId)) {
       return NextResponse.json(
@@ -15,7 +16,6 @@ export async function GET(
       );
     }
 
-    // Fetch schedule from contract
     const schedule = await getSchedule(scheduleId);
     
     if (!schedule) {
@@ -25,7 +25,6 @@ export async function GET(
       );
     }
 
-    // Fetch claimable amount
     const claimable = await getClaimable(scheduleId);
 
     return NextResponse.json(
