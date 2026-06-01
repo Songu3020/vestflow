@@ -34,6 +34,7 @@
 //! | `"Amount must be positive"`     | `create_schedule` with `total_amount` ≤ 0                        |
 //! | `"Duration must be positive"`   | `create_schedule` with `duration` = 0                            |
 //! | `"Cliff cannot exceed duration"`| `create_schedule` with `cliff_duration` > `duration`             |
+//! | `"Beneficiary must differ from grantor"` | `create_schedule` with `beneficiary == grantor`                 |
 //! | `"Re-entrant call detected"`    | A state-mutating entry point is called while already executing   |
 //! | `"Upgrade authority already initialized"` | `initialize_upgrade_authority` called more than once |
 //! | `"Upgrade authority not initialized"` | Upgrade announcement/execution attempted before authority setup |
@@ -384,6 +385,7 @@ impl VestFlowContract {
     /// Panics with `"Amount must be positive"` if `total_amount` ≤ 0.
     /// Panics with `"Duration must be positive"` if `duration` = 0.
     /// Panics with `"Cliff cannot exceed duration"` if `cliff_duration` > `duration`.
+    /// Panics with `"Beneficiary must differ from grantor"` if `beneficiary == grantor`.
     pub fn create_schedule(
         env: Env,
         grantor: Address,
@@ -398,6 +400,7 @@ impl VestFlowContract {
     ) -> u64 {
         grantor.require_auth();
 
+        assert!(beneficiary != grantor, "Beneficiary must differ from grantor");
         assert!(total_amount > 0, "Amount must be positive");
         assert!(duration > 0, "Duration must be positive");
         assert!(cliff_duration <= duration, "Cliff cannot exceed duration");
@@ -1201,5 +1204,58 @@ mod test {
         // At or after end: fully vested
         assert_eq!(schedule.vested_at(1), 1_000);
         assert_eq!(schedule.vested_at(u64::MAX), 1_000);
+    }
+
+    // --- Issue #9: beneficiary != grantor ---
+
+    #[test]
+    #[should_panic(expected = "Beneficiary must differ from grantor")]
+    fn test_cannot_vest_to_self() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, grantor, _, token_addr, _) = setup(&env);
+
+        set_time(&env, 0);
+        client.create_schedule(
+            &grantor,
+            &grantor, // beneficiary == grantor
+            &token_addr,
+            &1000,
+            &0,
+            &1000,
+            &0,
+            &VestingKind::Linear,
+            &false,
+        );
+    }
+
+    // --- Issue #11: double-claim same ledger ---
+
+    #[test]
+    #[should_panic(expected = "Nothing to claim yet")]
+    fn test_double_claim_same_ledger() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, grantor, beneficiary, token_addr, _) = setup(&env);
+
+        set_time(&env, 0);
+        let id = client.create_schedule(
+            &grantor,
+            &beneficiary,
+            &token_addr,
+            &1000,
+            &0,
+            &1000,
+            &0,
+            &VestingKind::Linear,
+            &false,
+        );
+
+        // Advance to 50% vested
+        set_time(&env, 500);
+        // First claim succeeds — claims 500
+        client.claim(&id);
+        // Second claim at same timestamp — should panic
+        client.claim(&id);
     }
 }
