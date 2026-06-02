@@ -244,7 +244,7 @@ export default function PublicSchedulePage() {
               {cliffTime && (
                 <div>
                   <p className="text-xs text-zinc-500 mb-1">Cliff Date</p>
-                  <p className="text-sm">{formatDate(cliffTime)}</p>
+                  <p className="text-sm">{formatCliffDate(schedule.cliff_duration, schedule.start_time)}</p>
                 </div>
               )}
             </div>

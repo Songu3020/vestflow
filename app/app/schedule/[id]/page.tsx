@@ -10,10 +10,12 @@ import {
   stroopsToXlm,
   vestingProgress,
   formatDate,
+  formatCliffDate,
   claimVested,
   revokeSchedule,
   parseContractError,
   NETWORK,
+  NATIVE_TOKEN,
 } from "@/lib/stellar";
 import { useWallet } from "@/lib/WalletContext";
 import { useXlmPrice, formatUsd } from "@/lib/price";
@@ -89,6 +91,8 @@ export default function ScheduleDetailPage() {
   const isGrantor = publicKey === schedule.grantor;
   const vested = BigInt(Math.floor(Number(schedule.total_amount) * progress / 100));
   const claimableAmt = vested > schedule.claimed ? vested - schedule.claimed : 0n;
+  const isNative = schedule.token === NATIVE_TOKEN;
+  const tokenSymbol = isNative ? "XLM" : `Token (${schedule.token.slice(0, 4)}...${schedule.token.slice(-4)})`;
 
   const statusColor = schedule.revoked
     ? "bg-red-500/10 text-red-400"
@@ -178,7 +182,7 @@ export default function ScheduleDetailPage() {
             {schedule.cliff_duration > 0 && (
               <div>
                 <p className="text-zinc-500 text-xs uppercase tracking-wider mb-1">Cliff Date</p>
-                <p className="text-zinc-300">{formatDate(schedule.start_time + schedule.cliff_duration)}</p>
+                <p className="text-zinc-300">{formatCliffDate(schedule.cliff_duration, schedule.start_time)}</p>
               </div>
             )}
             <div>

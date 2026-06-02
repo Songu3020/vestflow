@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { ScheduleData, stroopsToXlm, truncate, vestingProgress, formatDate, claimVested, revokeSchedule, parseContractError } from "@/lib/stellar";
+import { ScheduleData, stroopsToXlm, truncate, vestingProgress, formatDate, formatCliffDate, claimVested, revokeSchedule, parseContractError, NATIVE_TOKEN } from "@/lib/stellar";
 import { useWallet } from "@/lib/WalletContext";
 import VestingChart from "@/components/VestingChart";
 import { useXlmPrice, formatUsd } from "@/lib/price";
@@ -19,6 +19,8 @@ export default function ScheduleCard({ schedule, onAction }: { schedule: Schedul
   const isGrantor = publicKey === schedule.grantor;
   const vested = BigInt(Math.floor(Number(schedule.total_amount) * progress / 100));
   const claimableAmt = vested > schedule.claimed ? vested - schedule.claimed : BigInt(0);
+  const isNative = schedule.token === NATIVE_TOKEN;
+  const tokenSymbol = isNative ? "XLM" : `Token (${truncate(schedule.token, 4, 4)})`;
 
   const handleClaim = async () => {
     if (!publicKey) return;
@@ -75,6 +77,9 @@ export default function ScheduleCard({ schedule, onAction }: { schedule: Schedul
         </div>
         <div><span className="text-zinc-600">Starts</span><p className="text-zinc-300 mt-0.5">{formatDate(schedule.start_time)}</p></div>
         <div><span className="text-zinc-600">Ends</span><p className="text-zinc-300 mt-0.5">{formatDate(schedule.start_time + schedule.duration)}</p></div>
+        {!isNative && (
+          <div className="col-span-2"><span className="text-zinc-600">Token Contract</span><p className="font-mono text-zinc-300 mt-0.5 break-all">{schedule.token}</p></div>
+        )}
       </div>
 
       <div>
@@ -91,7 +96,7 @@ export default function ScheduleCard({ schedule, onAction }: { schedule: Schedul
             <p className="text-xs text-zinc-500 mt-1.5">
               Unlocks on{" "}
               <span className="text-zinc-300">
-                {formatDate(schedule.start_time + schedule.cliff_duration)}
+                {formatCliffDate(schedule.cliff_duration, schedule.start_time)}
               </span>
             </p>
           )}
