@@ -32,7 +32,7 @@ export default function CreateForm() {
       const startTs = Math.floor(startDateTime.getTime() / 1000);
 
       const hash = await createSchedule(
-        publicKey, form.beneficiary, parseFloat(form.amount),
+        publicKey, form.beneficiary, form.amount,
         startTs, parseInt(form.durationDays), parseInt(form.cliffDays),
         form.kind, form.revocable,
       );

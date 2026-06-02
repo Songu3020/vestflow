@@ -171,17 +171,28 @@ async function buildAndSend(publicKey: string, method: string, args: xdr.ScVal[]
   return submitted.hash;
 }
 
+export function xlmToStroops(amountXlm: string): bigint {
+  const normalized = amountXlm.trim();
+  if (!/^[0-9]+(?:\.[0-9]+)?$/.test(normalized)) {
+    throw new Error("Invalid amount");
+  }
+
+  const [whole, fraction = ""] = normalized.split(".");
+  const fractionPadded = (fraction + "0000000").slice(0, 7);
+  return BigInt(whole) * 10_000_000n + BigInt(fractionPadded);
+}
+
 export async function createSchedule(
   publicKey: string,
   beneficiary: string,
-  totalAmountXlm: number,
+  totalAmountXlm: string,
   startTime: number,
   durationDays: number,
   cliffDays: number,
   kind: "Linear" | "Cliff" | "LinearWithCliff",
   revocable: boolean
 ): Promise<string> {
-  const totalStroops = BigInt(Math.round(totalAmountXlm * 10_000_000));
+  const totalStroops = xlmToStroops(totalAmountXlm);
   const durationSecs = durationDays * 86400;
   const cliffSecs = cliffDays * 86400;
 
