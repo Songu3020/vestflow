@@ -403,7 +403,10 @@ impl VestFlowContract {
     ) -> u64 {
         grantor.require_auth();
 
-        assert!(beneficiary != grantor, "Beneficiary must differ from grantor");
+        assert!(
+            beneficiary != grantor,
+            "Beneficiary must differ from grantor"
+        );
         assert!(total_amount > 0, "Amount must be positive");
         assert!(duration > 0, "Duration must be positive");
         assert!(cliff_duration <= duration, "Cliff cannot exceed duration");
@@ -458,9 +461,10 @@ impl VestFlowContract {
             .get(&DataKey::BeneficiarySchedules(beneficiary.clone()))
             .unwrap_or(vec![&env]);
         beneficiary_ids.push_back(id);
-        env.storage()
-            .instance()
-            .set(&DataKey::BeneficiarySchedules(beneficiary.clone()), &beneficiary_ids);
+        env.storage().instance().set(
+            &DataKey::BeneficiarySchedules(beneficiary.clone()),
+            &beneficiary_ids,
+        );
 
         env.events().publish(
             (symbol_short!("created"), grantor, beneficiary, token),
@@ -506,7 +510,11 @@ impl VestFlowContract {
             .instance()
             .set(&DataKey::Schedule(schedule_id), &schedule);
         env.events().publish(
-            (symbol_short!("claimed"), schedule.beneficiary.clone(), schedule.token.clone()),
+            (
+                symbol_short!("claimed"),
+                schedule.beneficiary.clone(),
+                schedule.token.clone(),
+            ),
             (schedule_id, claimable, schedule.claimed),
         );
 
@@ -556,7 +564,11 @@ impl VestFlowContract {
             .instance()
             .set(&DataKey::Schedule(schedule_id), &schedule);
         env.events().publish(
-            (symbol_short!("revoked"), schedule.grantor.clone(), schedule.token.clone()),
+            (
+                symbol_short!("revoked"),
+                schedule.grantor.clone(),
+                schedule.token.clone(),
+            ),
             (schedule_id, unvested, vested),
         );
 
@@ -1386,9 +1398,10 @@ mod test {
                 args: soroban_sdk::vec![
                     &env,
                     soroban_sdk::IntoVal::<soroban_sdk::Env, soroban_sdk::Val>::into_val(&id, &env),
-                    soroban_sdk::IntoVal::<soroban_sdk::Env, soroban_sdk::Val>::into_val(&attacker, &env),
-                ]
-                .into(),
+                    soroban_sdk::IntoVal::<soroban_sdk::Env, soroban_sdk::Val>::into_val(
+                        &attacker, &env
+                    ),
+                ],
                 sub_invokes: &[],
             },
         }]);
