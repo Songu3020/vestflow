@@ -1409,6 +1409,7 @@ mod test {
             &0,
             &1000,
             &0,
+            &0,
             &VestingKind::Linear,
             &true,
         );
@@ -2234,5 +2235,85 @@ mod test {
             prop_assert!(claimable >= 0);
             prop_assert!(claimable <= total_amount);
         }
+    }
+}
+
+    #[test]
+    fn test_lockup_prevents_early_claim() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, grantor, beneficiary, token_addr, _) = setup(&env);
+
+        set_time(&env, 0);
+        let id = client.create_schedule(
+            &grantor,
+            &beneficiary,
+            &token_addr,
+            &1000,
+            &0,
+            &1000,
+            &0,
+            &600,
+            &VestingKind::Linear,
+            &false,
+        );
+
+        set_time(&env, 500);
+        assert_eq!(client.claimable(&id), 0);
+
+        set_time(&env, 600);
+        assert_eq!(client.claimable(&id), 600);
+    }
+
+    #[test]
+    fn test_lockup_with_cliff() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, grantor, beneficiary, token_addr, _) = setup(&env);
+        let token = TokenClient::new(&env, &token_addr);
+
+        set_time(&env, 0);
+        let id = client.create_schedule(
+            &grantor,
+            &beneficiary,
+            &token_addr,
+            &1000,
+            &0,
+            &1000,
+            &200,
+            &400,
+            &VestingKind::LinearWithCliff,
+            &false,
+        );
+
+        set_time(&env, 300);
+        assert_eq!(client.claimable(&id), 0);
+
+        set_time(&env, 400);
+        assert_eq!(client.claimable(&id), 200);
+        client.claim(&id);
+        assert_eq!(token.balance(&beneficiary), 200);
+    }
+
+    #[test]
+    #[should_panic(expected = "Lockup cannot be less than cliff")]
+    fn test_lockup_less_than_cliff_rejected() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, grantor, beneficiary, token_addr, _) = setup(&env);
+
+        set_time(&env, 0);
+        client.create_schedule(
+            &grantor,
+            &beneficiary,
+            &token_addr,
+            &1000,
+            &0,
+            &1000,
+            &500,
+            &300,
+            &VestingKind::Linear,
+            &false,
+        );
     }
 }
