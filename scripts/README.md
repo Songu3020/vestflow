@@ -50,11 +50,24 @@ Builds the release Wasm and regenerates typed TypeScript contract bindings.
 
 ### `contract-metrics.sh`
 
-Builds the release Wasm, reports its byte size, and checks the tracked per-schedule storage benchmark.
+Builds the release Wasm, optimizes it when Stellar CLI is available, reports byte size, and checks the tracked per-schedule storage benchmark. When `CONTRACT_ID` is set it also runs `stellar contract invoke --cost` against cheap read entry points.
 
 ```bash
 ./scripts/contract-metrics.sh
 ```
+
+### `upgrade-contract.sh`
+
+Builds and optimizes the contract, uploads the Wasm, announces the hash through the contract's `announce_upgrade` entry point, and executes the upgrade after the 48-hour timelock.
+
+```bash
+CONTRACT_ID=CC... SOURCE=my-key ./scripts/upgrade-contract.sh
+
+# Save the printed hash, wait for the timelock, then execute:
+CONTRACT_ID=CC... SOURCE=my-key WASM_HASH=<hash> ACTION=execute ./scripts/upgrade-contract.sh
+```
+
+Use `NETWORK=mainnet` for Mainnet. The current authority must already be initialized on-chain with `initialize_upgrade_authority`, and `SOURCE` must be that authority.
 
 ### `update-deployment-registry.sh`
 
