@@ -13,8 +13,18 @@ import { getSchedule, getClaimable } from "./stellar";
 
 export async function processNotifications(): Promise<void> {
   try {
-    console.log("Processing notifications...");
+    const { getAllScheduleIds } = await import("./db");
+    const scheduleIds = getAllScheduleIds();
     
+    if (scheduleIds.length === 0) {
+      return;
+    }
+
+    for (const scheduleId of scheduleIds) {
+      await checkAndSendCliffNotification(scheduleId);
+      await checkAndSendClaimableNotification(scheduleId);
+      await checkAndSendRevokedNotification(scheduleId);
+    }
   } catch (error) {
     console.error("Error processing notifications:", error);
   }

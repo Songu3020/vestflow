@@ -17,6 +17,7 @@ const cspHeader = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  output: process.env.DOCKER_BUILD ? "standalone" : undefined,
   turbopack: {
     root: process.cwd(),
   },

@@ -1,0 +1,79 @@
+version: "3.9"
+
+services:
+  # ── VestFlow Next.js API + Frontend ───────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vestflow-api
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_NETWORK=${NEXT_PUBLIC_NETWORK:-testnet}
+      - NEXT_PUBLIC_CONTRACT_ID=${NEXT_PUBLIC_CONTRACT_ID:-CCZ6AE75C27DMB3SOIHK7WZSBUG3NQPVLHSVEBQ2FSAEVGRJ5TXAZWCX}
+      - NEXT_PUBLIC_NATIVE_TOKEN=${NEXT_PUBLIC_NATIVE_TOKEN:-CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC}
+      - INDEXER_URL=http://indexer:3001
+      - REDIS_URL=redis://redis:6379
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY:-}
+      - NOTIFICATION_FROM_EMAIL=${NOTIFICATION_FROM_EMAIL:-noreply@vestflow.xyz}
+      - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL:-http://localhost:3000}
+    depends_on:
+      - indexer
+      - redis
+    restart: unless-stopped
+
+  # ── Event Indexer (Poller + Query Server) ─────────────────────────────
+  indexer:
+    build:
+      context: ./indexer
+      dockerfile: Dockerfile
+    container_name: vestflow-indexer
+    ports:
+      - "3001:3001"
+    environment:
+      - RPC_URL=${RPC_URL:-https://soroban-testnet.stellar.org}
+      - CONTRACT_ID=${NEXT_PUBLIC_CONTRACT_ID:-CCZ6AE75C27DMB3SOIHK7WZSBUG3NQPVLHSVEBQ2FSAEVGRJ5TXAZWCX}
+      - INDEXER_DB_PATH=/data/vestflow-events.db
+      - INDEXER_PORT=3001
+      - POLL_INTERVAL_MS=${POLL_INTERVAL_MS:-10000}
+      - START_LEDGER=${START_LEDGER:-0}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY:-}
+      - NOTIFICATION_FROM_EMAIL=${NOTIFICATION_FROM_EMAIL:-noreply@vestflow.xyz}
+      - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL:-http://localhost:3000}
+    volumes:
+      - indexer-data:/data
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # ── Redis (caching, notification queue, rate limiting) ────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: vestflow-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+  # ── (Optional) Stellar Quickstart Node ───────────────────────────────
+  # Uncomment the block below to run a local Stellar testnet node.
+   # stellar:
+   #   image: stellar/quickstart:soroban-dev
+   #   container_name: vestflow-stellar
+   #   ports:
+   #     - "8000:8000"
+   #   command: [
+   #     "--local", "--enable-soroban-rpc",
+   #     "--limits", "1000000",
+   #     "--service-core-port", "11626"
+   #   ]
+   #   volumes:
+   #     - stellar-data:/opt/stellar
+
+volumes:
+  indexer-data:
+  redis-data:
+  # stellar-data:

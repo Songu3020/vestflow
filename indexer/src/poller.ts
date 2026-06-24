@@ -16,6 +16,7 @@
 
 import { rpc as StellarRpc, xdr, scValToNative } from "@stellar/stellar-sdk";
 import { getCheckpoint, setCheckpoint, insertEvent } from "./db";
+import { processNotifications } from "./notifications";
 import type { EventType } from "./types";
 
 const RPC_URL =
@@ -189,6 +190,7 @@ async function run(): Promise<void> {
   // Poll immediately on start, then on each interval.
   while (true) {
     await poll();
+    await processNotifications();
     await new Promise<void>((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 }

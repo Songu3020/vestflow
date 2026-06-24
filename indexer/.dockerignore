@@ -1,0 +1,10 @@
+node_modules
+dist
+.git
+.gitignore
+*.md
+.env*
+.DS_Store
+vestflow-events.db
+vestflow-events.db-shm
+vestflow-events.db-wal

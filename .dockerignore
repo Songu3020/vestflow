@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.gitignore
+*.md
+.env*
+.DS_Store
+contracts/target
+indexer/node_modules
+indexer/dist
+lib/bindings/vestflow/dist
+sdk/node_modules
+sdk/dist
