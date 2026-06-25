@@ -1170,6 +1170,46 @@ impl VestFlowContract {
         }
         results
     }
+
+    /// View: return the vested amount for a schedule ID using linear
+    /// interpolation after the cliff.
+    ///
+    /// The vested amount is the total tokens that have unlocked according to
+    /// the schedule's vesting curve, including already-claimed tokens.
+    /// Returns 0 for unknown schedule IDs.
+    pub fn vested_amount(env: Env, schedule_id: u64) -> i128 {
+        match env
+            .storage()
+            .instance()
+            .get::<DataKey, VestingSchedule>(&DataKey::Schedule(schedule_id))
+        {
+            Some(schedule) => schedule.vested_at(env.ledger().timestamp()),
+            None => 0,
+        }
+    }
+
+    /// Batch view: return vested amounts for multiple schedule IDs in a
+    /// single simulation round-trip.
+    ///
+    /// Results are returned in the same order as the input `ids` vector.
+    /// Unknown IDs return 0 instead of panicking, so the caller can safely
+    /// pass the full ID range without knowing which ones exist.
+    pub fn vested_amount_bulk(env: Env, ids: Vec<u64>) -> Vec<i128> {
+        let now = env.ledger().timestamp();
+        let mut results: Vec<i128> = vec![&env];
+        for id in ids.iter() {
+            let amount = match env
+                .storage()
+                .instance()
+                .get::<DataKey, VestingSchedule>(&DataKey::Schedule(id))
+            {
+                Some(schedule) => schedule.vested_at(now),
+                None => 0,
+            };
+            results.push_back(amount);
+        }
+        results
+    }
 }
 
 #[cfg(test)]
