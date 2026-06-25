@@ -2,7 +2,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Navbar from "@/components/Navbar";
 import ScheduleCard from "@/components/ScheduleCard";
-import ScheduleCardSkeleton from "@/components/ScheduleCardSkeleton";
+import { ScheduleListSkeleton } from "@/components/ScheduleCardSkeleton";
+import {
+  NoSchedulesEmptyState,
+  NoSearchResultsEmptyState,
+  NoGrantorSchedulesEmptyState,
+  NoBeneficiarySchedulesEmptyState,
+} from "@/components/EmptyState";
 import {
   getAllSchedules,
   getClaimableBulk,
@@ -15,6 +21,7 @@ import { useWallet } from "@/lib/WalletContext";
 import { useCountUp } from "@/lib/useCountUp";
 import Link from "next/link";
 import { useXlmPrice, formatUsd } from "@/lib/price";
+import { buildCombinedExportCSV, downloadCSV } from "@/lib/csvExport";
 
 type RoleFilter = "all" | "grantor" | "beneficiary";
 type SortKey = "newest" | "ending-soon" | "largest-amount" | "status";
@@ -25,57 +32,6 @@ interface DashboardStats {
   totalReceiving: bigint;
   claimableNow: bigint;
   activeSchedules: number;
-}
-
-/**
- * Build a CSV string for the given schedules.
- * Columns: id, kind, grantor, beneficiary, token,
- *          total_amount_xlm, vested_xlm, claimed_xlm,
- *          start_date, end_date, cliff_date,
- *          revocable, revoked, status
- * (#87 – CSV export for vesting schedule history)
- */
-function buildCSV(rows: ScheduleData[]): string {
-  const now = Math.floor(Date.now() / 1000);
-  const headers = [
-    "id", "kind", "grantor", "beneficiary", "token",
-    "total_amount_xlm", "vested_xlm", "claimed_xlm",
-    "start_date", "end_date", "cliff_date",
-    "revocable", "revoked", "status",
-  ];
-  const escape = (v: string | number | boolean) =>
-    `"${String(v).replace(/"/g, '""')}"`;
-
-  const dataRows = rows.map((s) => {
-    const progress = vestingProgress(s, now);
-    const vestedXlm = (Number(s.total_amount) * progress) / 100 / 10_000_000;
-    const status = s.revoked
-      ? "Revoked"
-      : progress >= 100
-      ? "Fully Vested"
-      : "Vesting";
-
-    return [
-      s.id,
-      s.kind,
-      s.grantor,
-      s.beneficiary,
-      s.token,
-      (Number(s.total_amount) / 10_000_000).toFixed(7),
-      vestedXlm.toFixed(7),
-      (Number(s.claimed) / 10_000_000).toFixed(7),
-      formatDate(s.start_time),
-      formatDate(s.start_time + s.duration),
-      s.cliff_duration > 0 ? formatDate(s.start_time + s.cliff_duration) : "",
-      s.revocable,
-      s.revoked,
-      status,
-    ]
-      .map(escape)
-      .join(",");
-  });
-
-  return [headers.map(escape).join(","), ...dataRows].join("\n");
 }
 
 // ── Animated stats bar (#94) ──────────────────────────────────────────────────
@@ -257,14 +213,9 @@ export default function DashboardPage() {
   const paginated = searchFiltered.slice(pageStart, pageStart + PAGE_SIZE);
 
   const handleExportCSV = () => {
-    const csv = buildCSV(filteredSchedules);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "vesting-schedules.csv";
-    a.click();
-    URL.revokeObjectURL(url);
+    const csv = buildCombinedExportCSV(filteredSchedules);
+    const timestamp = new Date().toISOString().split('T')[0];
+    downloadCSV(csv, `vestflow-schedules-${timestamp}.csv`);
   };
 
   return (
@@ -394,32 +345,24 @@ export default function DashboardPage() {
 
         {/* Schedule grid */}
         {loading && schedules.length === 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {[1, 2, 3].map(i => (
-              <ScheduleCardSkeleton key={i} />
-            ))}
-          </div>
+          <ScheduleListSkeleton count={6} />
         ) : searchFiltered.length === 0 ? (
-          <div className="card p-16 text-center">
-            <p className="text-4xl mb-4">🔒</p>
-            <p className="text-zinc-400">
-              {q
-                ? "No schedules match that address."
-                : publicKey
-                ? roleFilter !== "all"
-                  ? `No schedules where you are the ${roleFilter}.`
-                  : "No vesting schedules found for your wallet."
-                : "Connect your wallet to see your schedules."}
-            </p>
-            {!q && (
-              <Link
-                href="/app/create"
-                className="inline-block mt-5 btn-primary rounded-lg px-5 py-2.5 text-sm font-semibold text-white"
-              >
-                Create Your First Schedule
-              </Link>
-            )}
-          </div>
+          q ? (
+            <NoSearchResultsEmptyState 
+              searchQuery={q} 
+              onClearSearch={() => setQuery("")} 
+            />
+          ) : publicKey ? (
+            roleFilter === "grantor" ? (
+              <NoGrantorSchedulesEmptyState />
+            ) : roleFilter === "beneficiary" ? (
+              <NoBeneficiarySchedulesEmptyState />
+            ) : (
+              <NoSchedulesEmptyState isConnected={true} />
+            )
+          ) : (
+            <NoSchedulesEmptyState isConnected={false} />
+          )
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
