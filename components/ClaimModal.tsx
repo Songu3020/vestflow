@@ -3,13 +3,13 @@ import { useState } from "react";
 import {
   ScheduleData,
   stroopsToXlm,
-  truncate,
   claimVested,
   parseContractError,
   NETWORK,
 } from "@/lib/stellar";
 import { useWallet } from "@/lib/WalletContext";
 import { useToast } from "@/components/Toast";
+import AddressLabel from "@/components/AddressLabel";
 import { useXlmPrice, formatUsd } from "@/lib/price";
 
 interface ClaimModalProps {
@@ -147,15 +147,21 @@ export default function ClaimModal({
           </div>
           <div className="flex justify-between items-center py-1">
             <span className="text-sm text-zinc-400">Beneficiary</span>
-            <span className="text-sm font-mono text-zinc-300">
-              {truncate(schedule.beneficiary)}
-            </span>
+            <AddressLabel
+              address={schedule.beneficiary}
+              compact
+              className="items-end text-right"
+              secondaryClassName="text-[11px] font-mono text-zinc-500"
+            />
           </div>
           <div className="flex justify-between items-center py-1">
             <span className="text-sm text-zinc-400">Grantor</span>
-            <span className="text-sm font-mono text-zinc-300">
-              {truncate(schedule.grantor)}
-            </span>
+            <AddressLabel
+              address={schedule.grantor}
+              compact
+              className="items-end text-right"
+              secondaryClassName="text-[11px] font-mono text-zinc-500"
+            />
           </div>
         </div>
 

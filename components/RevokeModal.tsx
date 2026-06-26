@@ -3,13 +3,13 @@ import { useState } from "react";
 import {
   ScheduleData,
   stroopsToXlm,
-  truncate,
   revokeSchedule,
   parseContractError,
   NETWORK,
 } from "@/lib/stellar";
 import { useWallet } from "@/lib/WalletContext";
 import { useToast } from "@/components/Toast";
+import AddressLabel from "@/components/AddressLabel";
 import { useXlmPrice, formatUsd } from "@/lib/price";
 
 interface RevokeModalProps {
@@ -149,9 +149,12 @@ export default function RevokeModal({
           <div className="border-t border-white/5 my-1" />
           <div className="flex justify-between items-center py-1">
             <span className="text-sm text-zinc-400">Beneficiary</span>
-            <span className="text-sm font-mono text-zinc-300">
-              {truncate(schedule.beneficiary)}
-            </span>
+            <AddressLabel
+              address={schedule.beneficiary}
+              compact
+              className="items-end text-right"
+              secondaryClassName="text-[11px] font-mono text-zinc-500"
+            />
           </div>
         </div>
 
