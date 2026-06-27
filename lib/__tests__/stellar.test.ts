@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { xlmToStroops, stroopsToXlm } from "../stellar";
+import {
+  ScheduleData,
+  stroopsToXlm,
+  vestingProgress,
+  xlmToStroops,
+} from "../stellar";
 
 describe("xlmToStroops", () => {
   it("converts minimum representable amount: 0.0000001 XLM = 1 stroop", () => {
@@ -85,5 +90,31 @@ describe("stroopsToXlm", () => {
   it("converts 100_000_000_000n stroops (10 000 XLM)", () => {
     const result = stroopsToXlm(100_000_000_000n);
     expect(parseFloat(result.replace(/,/g, ""))).toBeCloseTo(10_000, 0);
+  });
+});
+
+describe("vestingProgress", () => {
+  it("freezes progress while a schedule is paused", () => {
+    const schedule: ScheduleData = {
+      id: 1,
+      grantor: "GGRANTOR",
+      beneficiary: "GBENEFICIARY",
+      token: "CTOKEN",
+      total_amount: 100n,
+      claimed: 0n,
+      start_time: 100,
+      duration: 100,
+      cliff_duration: 0,
+      lockup_duration: 0,
+      kind: "Linear",
+      revocable: true,
+      revoked: false,
+      paused: true,
+      paused_duration: 10,
+      paused_at: 160,
+    };
+
+    expect(vestingProgress(schedule, 200)).toBe(50);
+    expect(vestingProgress(schedule, 300)).toBe(50);
   });
 });
