@@ -282,6 +282,7 @@ export default function CreateForm() {
 
   const tokenLabel =
     form.tokenAddress.trim() === NATIVE_TOKEN ? "XLM" : "Tokens";
+  // Show cliff field for any vesting kind that requires a cliff duration (#271)
   const showCliffField = form.kind === "Cliff" || form.kind === "LinearWithCliff";
 
   // ── Locked state ────────────────────────────────────────────────────────────
