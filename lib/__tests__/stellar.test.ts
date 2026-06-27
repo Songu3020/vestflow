@@ -1,10 +1,39 @@
 import { describe, it, expect } from "vitest";
 import {
+<<<<<<< HEAD
   ScheduleData,
   stroopsToXlm,
   vestingProgress,
   xlmToStroops,
 } from "../stellar";
+=======
+  xlmToStroops,
+  stroopsToXlm,
+  vestingProgress,
+  type ScheduleData,
+} from "../stellar";
+
+/** Build a ScheduleData with sensible defaults, overridable per-test. */
+function makeSchedule(overrides: Partial<ScheduleData> = {}): ScheduleData {
+  return {
+    id: 1,
+    grantor: "G".padEnd(56, "A"),
+    beneficiary: "G".padEnd(56, "B"),
+    token: "C".padEnd(56, "C"),
+    total_amount: 1_000n,
+    claimed: 0n,
+    start_time: 0,
+    duration: 1_000,
+    cliff_duration: 0,
+    lockup_duration: 0,
+    kind: "Linear",
+    revocable: true,
+    revoked: false,
+    vested_at_revoke: 0n,
+    ...overrides,
+  };
+}
+>>>>>>> upstream/main
 
 describe("xlmToStroops", () => {
   it("converts minimum representable amount: 0.0000001 XLM = 1 stroop", () => {
@@ -94,6 +123,7 @@ describe("stroopsToXlm", () => {
 });
 
 describe("vestingProgress", () => {
+<<<<<<< HEAD
   it("freezes progress while a schedule is paused", () => {
     const schedule: ScheduleData = {
       id: 1,
@@ -116,5 +146,52 @@ describe("vestingProgress", () => {
 
     expect(vestingProgress(schedule, 200)).toBe(50);
     expect(vestingProgress(schedule, 300)).toBe(50);
+=======
+  it("returns the time-based percentage for an active linear schedule", () => {
+    const s = makeSchedule({ start_time: 0, duration: 1_000 });
+    expect(vestingProgress(s, 500)).toBe(50);
+  });
+
+  it("returns 0 before the schedule start time", () => {
+    const s = makeSchedule({ start_time: 1_000, duration: 1_000 });
+    expect(vestingProgress(s, 500)).toBe(0);
+  });
+
+  it("caps active progress at 100", () => {
+    const s = makeSchedule({ start_time: 0, duration: 1_000 });
+    expect(vestingProgress(s, 5_000)).toBe(100);
+  });
+
+  // --- Issue #273: revoked schedules freeze at the revocation point ---
+
+  it("returns the vested-at-revoke percentage for a revoked schedule, ignoring elapsed time", () => {
+    const s = makeSchedule({
+      start_time: 0,
+      duration: 1_000,
+      revoked: true,
+      total_amount: 1_000n,
+      vested_at_revoke: 700n,
+    });
+    // Time-based would be 100% at now=5000, but revocation froze it at 70%.
+    expect(vestingProgress(s, 5_000)).toBe(70);
+  });
+
+  it("returns 0 for a revoked schedule with nothing vested at revoke", () => {
+    const s = makeSchedule({
+      revoked: true,
+      total_amount: 1_000n,
+      vested_at_revoke: 0n,
+    });
+    expect(vestingProgress(s, 500)).toBe(0);
+  });
+
+  it("returns 0 for a revoked schedule with zero total amount", () => {
+    const s = makeSchedule({
+      revoked: true,
+      total_amount: 0n,
+      vested_at_revoke: 0n,
+    });
+    expect(vestingProgress(s, 500)).toBe(0);
+>>>>>>> upstream/main
   });
 });
