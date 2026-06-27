@@ -1,163 +1,25 @@
 "use client";
 import { useState } from "react";
-import { createSchedule, CONTRACT_ID, parseContractError, NETWORK, NATIVE_TOKEN } from "@/lib/stellar";
+import { createSchedule, CONTRACT_ID, parseContractError, NETWORK, NATIVE_TOKEN, stroopsToXlm, xlmToStroops } from "@/lib/stellar";
 import { useWallet } from "@/lib/WalletContext";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type VestingKind = "Linear" | "Cliff" | "LinearWithCliff";
-
-interface FormState {
-  beneficiary: string;
-  tokenAddress: string;
-  amount: string;
-  startDate: string;
-  startTime: string;
-  durationDays: string;
-  cliffDays: string;
-  kind: VestingKind;
-  revocable: boolean;
+function estimateClaimable(
+  totalStroops: bigint,
+  startTs: number,
+  durationSecs: number,
+  cliffSecs: number,
+  kind: "Linear" | "Cliff",
+  previewTs: number
+): bigint {
+  if (previewTs <= startTs || durationSecs <= 0) return 0n;
+  const elapsed = previewTs - startTs;
+  if (kind === "Cliff") {
+    return elapsed >= cliffSecs ? totalStroops : 0n;
+  }
+  // Linear
+  if (elapsed >= durationSecs) return totalStroops;
+  return (totalStroops * BigInt(elapsed)) / BigInt(durationSecs);
 }
-
-type FormErrors = Partial<Record<keyof FormState, string>>;
-
-// ─── Validation ───────────────────────────────────────────────────────────────
-
-/** Minimal Stellar address check: starts with G, length 56, alphanumeric. */
-function isValidStellarAddress(addr: string): boolean {
-  return /^G[A-Z2-7]{55}$/.test(addr.trim());
-}
-
-function validateForm(form: FormState): FormErrors {
-  const errors: FormErrors = {};
-
-  if (!form.beneficiary.trim()) {
-    errors.beneficiary = "Beneficiary address is required.";
-  } else if (!isValidStellarAddress(form.beneficiary)) {
-    errors.beneficiary = "Must be a valid Stellar address starting with G (56 characters).";
-  }
-
-  if (!form.tokenAddress.trim()) {
-    errors.tokenAddress = "Token address is required.";
-  } else if (!isValidStellarAddress(form.tokenAddress)) {
-    errors.tokenAddress = "Must be a valid SEP-41 token contract address (starts with G, 56 characters).";
-  }
-
-  const amt = parseFloat(form.amount);
-  if (!form.amount) {
-    errors.amount = "Total amount is required.";
-  } else if (isNaN(amt) || amt <= 0) {
-    errors.amount = "Amount must be a positive number.";
-  }
-
-  if (!form.startDate) {
-    errors.startDate = "Start date is required.";
-  } else {
-    const [hours, minutes] = form.startTime.split(":").map(Number);
-    const dt = new Date(form.startDate);
-    dt.setHours(hours, minutes, 0, 0);
-    if (dt.getTime() < Date.now()) {
-      errors.startDate = "Start date/time must be in the future.";
-    }
-  }
-
-  const dur = parseInt(form.durationDays);
-  if (!form.durationDays) {
-    errors.durationDays = "Total duration is required.";
-  } else if (isNaN(dur) || dur < 1) {
-    errors.durationDays = "Duration must be at least 1 day.";
-  }
-
-  if (form.kind === "Cliff" || form.kind === "LinearWithCliff") {
-    const cliff = parseInt(form.cliffDays);
-    if (!form.cliffDays && form.cliffDays !== "0") {
-      errors.cliffDays = "Cliff duration is required for this vesting type.";
-    } else if (isNaN(cliff) || cliff < 0) {
-      errors.cliffDays = "Cliff must be 0 or more days.";
-    } else if (!isNaN(cliff) && !isNaN(dur) && cliff > dur) {
-      errors.cliffDays = "Cliff cannot exceed total duration.";
-    }
-  }
-
-  return errors;
-}
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function Field({
-  label,
-  htmlFor,
-  error,
-  hint,
-  children,
-}: {
-  label: string;
-  htmlFor?: string;
-  error?: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={htmlFor} className="text-sm text-zinc-400">
-        {label}
-      </label>
-      {children}
-      {hint && !error && <p className="text-xs text-zinc-500">{hint}</p>}
-      {error && (
-        <p className="text-xs text-red-400" role="alert">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function SummaryItem({
-  label,
-  value,
-  full,
-}: {
-  label: string;
-  value: string;
-  full?: boolean;
-}) {
-  return (
-    <div className={`flex flex-col gap-1 ${full ? "col-span-2" : ""}`}>
-      <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">
-        {label}
-      </span>
-      <span
-        className={`text-sm ${full ? "font-mono break-all" : "font-medium"} text-zinc-200`}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
-// ─── Vesting kind descriptions ────────────────────────────────────────────────
-
-const KIND_OPTIONS: { value: VestingKind; label: string; description: string }[] = [
-  {
-    value: "Linear",
-    label: "Linear",
-    description: "Tokens unlock gradually and continuously from start to end.",
-  },
-  {
-    value: "Cliff",
-    label: "Cliff",
-    description: "No tokens are claimable until the cliff date, then the full amount unlocks at once.",
-  },
-  {
-    value: "LinearWithCliff",
-    label: "Linear with Cliff",
-    description:
-      "No tokens unlock until the cliff date (typical 1-year cliff), then linear vesting for the remainder.",
-  },
-];
-
-// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function CreateForm() {
   const { publicKey } = useWallet();
@@ -179,6 +41,7 @@ export default function CreateForm() {
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [txHash, setTxHash] = useState("");
   const [errMsg, setErrMsg] = useState("");
+  const [previewDate, setPreviewDate] = useState("");
 
   const set = (k: keyof FormState, v: string | boolean) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -219,12 +82,12 @@ export default function CreateForm() {
         publicKey,
         form.beneficiary.trim(),
         form.amount,
-        form.tokenAddress.trim(),
+        form.tokenAddress,
         startTs,
         parseInt(form.durationDays),
-        form.kind !== "Linear" ? parseInt(form.cliffDays || "0") : 0,
+        parseInt(form.cliffDays),
         form.kind,
-        form.revocable
+        form.revocable,
       );
       setTxHash(hash);
       setStatus("done");
@@ -343,6 +206,36 @@ export default function CreateForm() {
               Contract:{" "}
               <span className="font-mono text-zinc-400">{CONTRACT_ID}</span>
             </p>
+          </div>
+
+          {/* Future claimable preview (#258) */}
+          <div className="border-t border-zinc-700/50 pt-3 flex flex-col gap-2">
+            <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">Preview Claimable At Date</span>
+            <input
+              type="date"
+              value={previewDate}
+              onChange={(e) => setPreviewDate(e.target.value)}
+              className="input text-sm px-3 py-1.5 rounded-lg bg-zinc-800/60 border border-zinc-700 text-zinc-200 focus:outline-none focus:border-violet-500 w-full"
+            />
+            {previewDate && form.amount && form.startDate && form.durationDays && (() => {
+              try {
+                const totalStroops = xlmToStroops(form.amount);
+                const [hours, minutes] = form.startTime.split(":").map(Number);
+                const startDt = new Date(form.startDate);
+                startDt.setHours(hours, minutes, 0, 0);
+                const startTs = Math.floor(startDt.getTime() / 1000);
+                const durationSecs = parseInt(form.durationDays) * 86400;
+                const cliffSecs = parseInt(form.cliffDays || "0") * 86400;
+                const previewTs = Math.floor(new Date(previewDate).getTime() / 1000);
+                const estimated = estimateClaimable(totalStroops, startTs, durationSecs, cliffSecs, form.kind, previewTs);
+                return (
+                  <p className="text-sm text-zinc-400">
+                    At this date you could claim approximately{" "}
+                    <span className="font-semibold text-violet-300">{stroopsToXlm(estimated)} {form.tokenAddress === NATIVE_TOKEN ? "XLM" : "Tokens"}</span>
+                  </p>
+                );
+              } catch { return null; }
+            })()}
           </div>
         </div>
 

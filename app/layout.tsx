@@ -6,6 +6,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "VestFlow — Token Vesting on Stellar",
   description: "Create and manage token vesting schedules on the Stellar network using Soroban smart contracts.",
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+  },
 };
 
 // Inlined before React hydration so the correct class is applied

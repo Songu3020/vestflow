@@ -18,7 +18,8 @@ import {
   formatDate,
 } from "@/lib/stellar";
 import { useWallet } from "@/lib/WalletContext";
-import { useCountUp } from "@/lib/useCountUp";
+import { useCountUp } from "@/hooks/useCountUp";
+import { useAddressBook } from "@/hooks/useAddressBook";
 import Link from "next/link";
 import { useXlmPrice, formatUsd } from "@/lib/price";
 import { buildCombinedExportCSV, downloadCSV } from "@/lib/csvExport";
@@ -26,6 +27,7 @@ import { buildCombinedExportCSV, downloadCSV } from "@/lib/csvExport";
 type RoleFilter = "all" | "grantor" | "beneficiary";
 type SortKey = "newest" | "ending-soon" | "largest-amount" | "status";
 const PAGE_SIZE = 10;
+const ALL_ASSETS = "all";
 
 interface DashboardStats {
   totalGranted: bigint;
@@ -112,6 +114,7 @@ function AnimatedStats({ stats }: { stats: DashboardStats }) {
 
 export default function DashboardPage() {
   const { publicKey } = useWallet();
+  const { getLabel } = useAddressBook();
   const [schedules, setSchedules] = useState<ScheduleData[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -119,6 +122,7 @@ export default function DashboardPage() {
   const [sortBy, setSortBy] = useState<SortKey>("newest");
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
+  const [assetFilter, setAssetFilter] = useState(ALL_ASSETS);
   const xlmPrice = useXlmPrice();
 
   const load = async () => {
@@ -164,12 +168,25 @@ export default function DashboardPage() {
 
   useEffect(() => { load(); }, [publicKey]);
 
+  // Get unique assets from schedules
+  const availableAssets = useMemo(() => {
+    const assets = new Set<string>();
+    schedules.forEach(s => assets.add(s.token));
+    return Array.from(assets).sort();
+  }, [schedules]);
+
   // Apply role filter on top of the wallet-filtered list
-  const filteredSchedules = useMemo(() => {
+  const roleFiltered = useMemo(() => {
     if (!publicKey || roleFilter === "all") return schedules;
     if (roleFilter === "grantor") return schedules.filter(s => s.grantor === publicKey);
     return schedules.filter(s => s.beneficiary === publicKey);
   }, [schedules, roleFilter, publicKey]);
+
+  // Apply asset filter
+  const filteredSchedules = useMemo(() => {
+    if (assetFilter === ALL_ASSETS) return roleFiltered;
+    return roleFiltered.filter(s => s.token === assetFilter);
+  }, [roleFiltered, assetFilter]);
 
   // Apply sort on top of the role-filtered list
   const sortedSchedules = useMemo(() => {
@@ -201,12 +218,14 @@ export default function DashboardPage() {
     return sortedSchedules.filter(
       s =>
         s.grantor.toLowerCase().includes(q) ||
-        s.beneficiary.toLowerCase().includes(q)
+        s.beneficiary.toLowerCase().includes(q) ||
+        (getLabel(s.grantor) ?? "").toLowerCase().includes(q) ||
+        (getLabel(s.beneficiary) ?? "").toLowerCase().includes(q)
     );
-  }, [sortedSchedules, q]);
+  }, [sortedSchedules, q, getLabel]);
 
   // Reset to page 1 whenever the filtered set changes
-  useEffect(() => { setPage(1); }, [searchFiltered.length, roleFilter, sortBy]);
+  useEffect(() => { setPage(1); }, [searchFiltered.length, roleFilter, sortBy, assetFilter]);
 
   const totalPages = Math.max(1, Math.ceil(searchFiltered.length / PAGE_SIZE));
   const pageStart = (page - 1) * PAGE_SIZE;
@@ -221,7 +240,7 @@ export default function DashboardPage() {
   return (
     <>
       <Navbar />
-      <main className="max-w-5xl mx-auto px-6 pt-28 pb-20">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 pt-24 sm:pt-28 pb-20">
         {/* Header row */}
         <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
           <div>
@@ -304,6 +323,26 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Asset filter */}
+        {schedules.length > 0 && availableAssets.length > 0 && (
+          <div className="flex items-center gap-2 mb-5 flex-wrap">
+            <label htmlFor="asset-select" className="text-xs text-zinc-500">Asset</label>
+            <select
+              id="asset-select"
+              value={assetFilter}
+              onChange={e => setAssetFilter(e.target.value)}
+              className="text-xs bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-zinc-300 outline-none focus:border-violet-500/50 transition-colors"
+            >
+              <option value={ALL_ASSETS}>All assets</option>
+              {availableAssets.map(asset => (
+                <option key={asset} value={asset}>
+                  {asset.slice(0, 8)}...
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Sort control */}
         {searchFiltered.length > 0 && (
           <div className="flex items-center gap-2 mb-5">
@@ -328,9 +367,9 @@ export default function DashboardPage() {
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Search by address…"
+            placeholder="Search by address or label…"
             className="input pr-8"
-            aria-label="Search schedules by address"
+            aria-label="Search schedules by address or label"
           />
           {query && (
             <button

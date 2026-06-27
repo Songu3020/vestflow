@@ -5,14 +5,17 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { useToast } from "@/components/Toast";
 import VestingChart from "@/components/VestingChart";
+import ClaimModal from "@/components/ClaimModal";
+import AddressLabel from "@/components/AddressLabel";
 import {
   getSchedule,
+  getClaimableAtTimestamp,
+  transferGrantor,
   ScheduleData,
   stroopsToXlm,
   vestingProgress,
   formatDate,
   formatCliffDate,
-  claimVested,
   revokeSchedule,
   parseContractError,
   NETWORK,
@@ -20,6 +23,7 @@ import {
 } from "@/lib/stellar";
 import { useWallet } from "@/lib/WalletContext";
 import { useXlmPrice, formatUsd } from "@/lib/price";
+import { ScheduleDetailSkeleton } from "@/components/ScheduleCardSkeleton";
 
 export default function ScheduleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -28,9 +32,21 @@ export default function ScheduleDetailPage() {
   const [schedule, setSchedule] = useState<ScheduleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<"claim" | "revoke" | null>(null);
+  const [showClaimModal, setShowClaimModal] = useState(false);
   const [err, setErr] = useState("");
   const [lastTxHash, setLastTxHash] = useState<string | null>(null);
   const xlmPrice = useXlmPrice();
+
+  // Future preview state (#258)
+  const [previewDate, setPreviewDate] = useState("");
+  const [previewAmount, setPreviewAmount] = useState<bigint | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  // Transfer grantor state (#262)
+  const [showTransferGrantor, setShowTransferGrantor] = useState(false);
+  const [newGrantorInput, setNewGrantorInput] = useState("");
+  const [transferGrantorLoading, setTransferGrantorLoading] = useState(false);
+  const [transferGrantorErr, setTransferGrantorErr] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -42,33 +58,6 @@ export default function ScheduleDetailPage() {
   useEffect(() => { load(); }, [id]);
 
   const now = Math.floor(Date.now() / 1000);
-
-  const handleClaim = async () => {
-    if (!publicKey || !schedule) return;
-    setActionLoading("claim"); setErr(""); setLastTxHash(null);
-    const toastId = addToast({
-      status: "pending",
-      title: "Claim pending…",
-      message: "Waiting for transaction to confirm.",
-    });
-    try {
-      const hash = await claimVested(publicKey, schedule.id);
-      setLastTxHash(hash);
-      updateToast(toastId, {
-        status: "success",
-        title: "Tokens claimed!",
-        message: `${stroopsToXlm(claimableAmt)} XLM transferred to your wallet.`,
-        txHash: hash,
-        network: NETWORK,
-      });
-      await load();
-    }
-    catch (e: any) {
-      setErr(parseContractError(e));
-      updateToast(toastId, { status: "error", title: "Claim failed", message: parseContractError(e) });
-    }
-    finally { setActionLoading(null); }
-  };
 
   const handleRevoke = async () => {
     if (!publicKey || !schedule) return;
@@ -97,11 +86,42 @@ export default function ScheduleDetailPage() {
     finally { setActionLoading(null); }
   };
 
+  const handlePreviewDate = async (date: string) => {
+    setPreviewDate(date);
+    if (!date || !schedule) { setPreviewAmount(null); return; }
+    setPreviewLoading(true);
+    const ts = Math.floor(new Date(date).getTime() / 1000);
+    const amount = await getClaimableAtTimestamp(schedule.id, ts, publicKey ?? undefined);
+    setPreviewAmount(amount);
+    setPreviewLoading(false);
+  };
+
+  const handleTransferGrantor = async () => {
+    if (!publicKey || !schedule || !newGrantorInput.trim()) return;
+    setTransferGrantorLoading(true);
+    setTransferGrantorErr("");
+    const toastId = addToast({ status: "pending", title: "Transfer pending…", message: "Waiting for transaction to confirm." });
+    try {
+      const hash = await transferGrantor(publicKey, schedule.id, newGrantorInput.trim());
+      setLastTxHash(hash);
+      updateToast(toastId, { status: "success", title: "Grantor transferred", message: "Rights moved to the new address.", txHash: hash, network: NETWORK });
+      setShowTransferGrantor(false);
+      setNewGrantorInput("");
+      await load();
+    } catch (e: any) {
+      const msg = parseContractError(e);
+      setTransferGrantorErr(msg);
+      updateToast(toastId, { status: "error", title: "Transfer failed", message: msg });
+    } finally {
+      setTransferGrantorLoading(false);
+    }
+  };
+
   if (loading) return (
     <>
       <Navbar />
       <main className="max-w-3xl mx-auto px-6 pt-28 pb-20">
-        <div className="h-96 rounded-2xl bg-white/3 animate-pulse" />
+        <ScheduleDetailSkeleton />
       </main>
     </>
   );
@@ -207,14 +227,36 @@ export default function ScheduleDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div>
               <p className="text-zinc-500 text-xs uppercase tracking-wider mb-1">Grantor</p>
-              <a href={`https://stellar.expert/explorer/${NETWORK}/account/${schedule.grantor}`} target="_blank" rel="noopener noreferrer" className="font-mono text-zinc-300 hover:text-violet-300 break-all transition-colors">
-                {schedule.grantor}
+              <AddressLabel
+                address={schedule.grantor}
+                fullAddress
+                editable
+                secondaryClassName="text-xs font-mono text-zinc-500 break-all"
+              />
+              <a
+                href={`https://stellar.expert/explorer/${NETWORK}/account/${schedule.grantor}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-block text-xs text-violet-300 hover:text-violet-200 transition-colors"
+              >
+                View on Stellar Expert →
               </a>
             </div>
             <div>
               <p className="text-zinc-500 text-xs uppercase tracking-wider mb-1">Beneficiary</p>
-              <a href={`https://stellar.expert/explorer/${NETWORK}/account/${schedule.beneficiary}`} target="_blank" rel="noopener noreferrer" className="font-mono text-zinc-300 hover:text-violet-300 break-all transition-colors">
-                {schedule.beneficiary}
+              <AddressLabel
+                address={schedule.beneficiary}
+                fullAddress
+                editable
+                secondaryClassName="text-xs font-mono text-zinc-500 break-all"
+              />
+              <a
+                href={`https://stellar.expert/explorer/${NETWORK}/account/${schedule.beneficiary}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-block text-xs text-violet-300 hover:text-violet-200 transition-colors"
+              >
+                View on Stellar Expert →
               </a>
             </div>
             <div>
@@ -253,6 +295,31 @@ export default function ScheduleDetailPage() {
             </div>
           </div>
 
+          {/* Future claimable preview (#258) */}
+          {!schedule.revoked && (
+            <div className="border-t border-white/5 pt-4">
+              <p className="text-zinc-500 text-xs uppercase tracking-wider mb-2">Preview Claimable At Date</p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <input
+                  type="date"
+                  value={previewDate}
+                  onChange={(e) => handlePreviewDate(e.target.value)}
+                  className="input text-sm px-3 py-1.5 rounded-lg bg-zinc-800/60 border border-zinc-700 text-zinc-200 focus:outline-none focus:border-violet-500"
+                />
+                {previewLoading && <span className="text-xs text-zinc-500">Calculating…</span>}
+                {!previewLoading && previewAmount !== null && (
+                  <span className="text-sm text-zinc-300">
+                    <span className="font-semibold text-violet-300">{stroopsToXlm(previewAmount)} XLM</span>
+                    {xlmPrice !== null && previewAmount > 0n && (
+                      <span className="text-zinc-500 ml-1">({(Number(previewAmount) / 10_000_000 * xlmPrice).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 })})</span>
+                    )}
+                    <span className="text-zinc-500 ml-1">claimable</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Share link */}
           <div className="border-t border-white/5 pt-4">
             <p className="text-zinc-500 text-xs uppercase tracking-wider mb-1">Shareable Link</p>
@@ -285,13 +352,10 @@ export default function ScheduleDetailPage() {
             <div className="flex gap-3 flex-wrap">
               {isBeneficiary && claimableAmt > 0n && (
                 <button
-                  onClick={handleClaim}
-                  disabled={!!actionLoading}
-                  className="btn-primary rounded-xl px-5 py-2.5 font-semibold text-white text-sm disabled:opacity-60"
+                  onClick={() => setShowClaimModal(true)}
+                  className="btn-primary rounded-xl px-5 py-2.5 font-semibold text-white text-sm"
                 >
-                  {actionLoading === "claim"
-                    ? "Processing…"
-                    : `Claim ${stroopsToXlm(claimableAmt)} XLM${xlmPrice !== null ? ` (${formatUsd(claimableAmt, xlmPrice)})` : ""}`}
+                  Claim {stroopsToXlm(claimableAmt)} XLM{xlmPrice !== null ? ` (${formatUsd(claimableAmt, xlmPrice)})` : ""}
                 </button>
               )}
               {isGrantor && schedule.revocable && progress < 100 && (
@@ -303,10 +367,60 @@ export default function ScheduleDetailPage() {
                   {actionLoading === "revoke" ? "Processing…" : "Revoke Schedule"}
                 </button>
               )}
+              {isGrantor && (
+                <button
+                  onClick={() => { setShowTransferGrantor((v) => !v); setTransferGrantorErr(""); }}
+                  className="rounded-xl px-5 py-2.5 border border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200 transition-colors text-sm"
+                >
+                  Transfer Grantor Rights
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Transfer grantor form (#262) */}
+          {showTransferGrantor && isGrantor && (
+            <div className="flex flex-col gap-3 bg-zinc-900/50 rounded-xl p-4 border border-zinc-800">
+              <p className="text-sm text-zinc-300 font-medium">Transfer Grantor Rights</p>
+              <p className="text-xs text-zinc-500">Move revocation and pause rights to a new address. This action requires your wallet signature.</p>
+              <input
+                type="text"
+                placeholder="New grantor address (G…)"
+                value={newGrantorInput}
+                onChange={(e) => setNewGrantorInput(e.target.value)}
+                className="input text-sm"
+              />
+              {transferGrantorErr && (
+                <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{transferGrantorErr}</p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  onClick={handleTransferGrantor}
+                  disabled={transferGrantorLoading || !newGrantorInput.trim()}
+                  className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
+                >
+                  {transferGrantorLoading ? "Processing…" : "Confirm Transfer"}
+                </button>
+                <button
+                  onClick={() => { setShowTransferGrantor(false); setNewGrantorInput(""); setTransferGrantorErr(""); }}
+                  className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors px-4 py-2"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
         </div>
       </main>
+
+      <ClaimModal
+        schedule={schedule}
+        claimableAmt={claimableAmt}
+        tokenSymbol={tokenSymbol}
+        open={showClaimModal}
+        onClose={() => setShowClaimModal(false)}
+        onSuccess={() => { setShowClaimModal(false); load(); }}
+      />
     </>
   );
 }
